@@ -1,0 +1,15 @@
+POST http://localhost:8082/api/payments
+Content-Type: application/json
+
+{
+  "orderId": 1001,
+  "userId": 123,
+  "amount": 99.99,
+  "currency": "USD",
+  "paymentMethod": "STRIPE",
+  "cardNumber": "4242424242424242",
+  "cardHolderName": "John Doe",
+  "expiryMonth": "12",
+  "expiryYear": "2025",
+  "cvv": "123"
+}
