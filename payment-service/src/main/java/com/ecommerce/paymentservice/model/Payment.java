@@ -14,26 +14,23 @@ public class Payment {
     private Long id;
     
     @Column(name = "payment_id", unique = true, nullable = false)
-    @NotNull(message = "Payment ID is required")
+
     private String paymentId;
     
     @Column(name = "payment_date", nullable = false)
-    @NotNull(message = "Payment date is required")
     private LocalDateTime paymentDate;
     
     @Column(name = "amount", nullable = false)
-    @NotNull(message = "Amount is required")
-    @Positive(message = "Amount must be positive")
+
+    @Positive
     private Double amount;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "method", nullable = false)
-    @NotNull(message = "Payment method is required")
     private PaymentMethod method;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    @NotNull(message = "Payment status is required")
     private PaymentStatus status;
     
     // Constructors
