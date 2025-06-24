@@ -1,5 +1,7 @@
 package com.ecommerce.productservice.dto;
 
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,13 +10,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductDto {
-    private Long id;
+
+    @Id
+    @GeneratedValue
+    private UUID id;
     
     @NotBlank(message = "Product name is required")
     private String name;
@@ -25,18 +30,13 @@ public class ProductDto {
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     private BigDecimal price;
     
-    private String imageUrl;
-    
     @NotNull(message = "Stock quantity is required")
     private Integer stockQuantity;
     
     private Boolean active;
     
     private Long categoryId;
-    
+
     private String categoryName;
-    
-    private LocalDateTime createdAt;
-    
-    private LocalDateTime updatedAt;
+
 }

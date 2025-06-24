@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -19,9 +20,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     
     Page<Product> findByActiveTrue(Pageable pageable);
     
-    List<Product> findByCategoryIdAndActiveTrue(Long categoryId);
+    List<Product> findByCategoryIdAndActiveTrue(UUID categoryId);
     
-    Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
+    Page<Product> findByCategoryIdAndActiveTrue(UUID categoryId, Pageable pageable);
     
     @Query("SELECT p FROM Product p WHERE p.active = true AND " +
            "(:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
@@ -34,7 +35,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                         @Param("maxPrice") BigDecimal maxPrice,
                                         Pageable pageable);
     
-    Optional<Product> findByIdAndActiveTrue(Long id);
+    Optional<Product> findByIdAndActiveTrue(UUID id);
     
     @Query("SELECT p FROM Product p WHERE p.stockQuantity <= :threshold AND p.active = true")
     List<Product> findLowStockProducts(@Param("threshold") Integer threshold);

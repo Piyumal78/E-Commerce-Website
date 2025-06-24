@@ -1,205 +1,134 @@
 package com.ecommerce.paymentservice.service;
 
-import com.ecommerce.paymentservice.dto.PaymentDto;
-import com.ecommerce.paymentservice.dto.PaymentRequestDto;
-import com.ecommerce.paymentservice.entity.Payment;
-import com.ecommerce.paymentservice.entity.PaymentStatus;
-import com.ecommerce.paymentservice.exception.PaymentNotFoundException;
-import com.ecommerce.paymentservice.exception.PaymentProcessingException;
-import com.ecommerce.paymentservice.gateway.PaymentGateway;
-import com.ecommerce.paymentservice.gateway.PaymentGatewayResponse;
+import com.ecommerce.paymentservice.dto.PaymentRequest;
+import com.ecommerce.paymentservice.dto.PaymentResponse;
+import com.ecommerce.paymentservice.model.Payment;
+import com.ecommerce.paymentservice.model.PaymentStatus;
 import com.ecommerce.paymentservice.repository.PaymentRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
-@Transactional
 public class PaymentService {
     
-    private final PaymentRepository paymentRepository;
-    private final List<PaymentGateway> paymentGateways;
+    @Autowired
+    private PaymentRepository paymentRepository;
     
-    public PaymentDto initiatePayment(PaymentRequestDto paymentRequest) {
-        log.info("Initiating payment for order: {} user: {} amount: {}", 
-                paymentRequest.getOrderId(), paymentRequest.getUserId(), paymentRequest.getAmount());
+    public PaymentResponse createPayment(PaymentRequest paymentRequest) {
+        // Generate unique payment ID if not provided
+        String paymentId = paymentRequest.getPaymentId();
+        if (paymentId == null || paymentId.trim().isEmpty()) {
+            paymentId = "PAY-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
         
-        // Create payment record
-        Payment payment = createPaymentRecord(paymentRequest);
-        payment = paymentRepository.save(payment);
+        // Check if payment ID already exists
+        if (paymentRepository.existsByPaymentId(paymentId)) {
+            throw new RuntimeException("Payment ID already exists: " + paymentId);
+        }
         
-        // Process payment asynchronously
-        processPaymentAsync(payment.getId(), paymentRequest);
+        Payment payment = new Payment();
+        payment.setPaymentId(paymentId);
+        payment.setPaymentDate(paymentRequest.getPaymentDate() != null ? 
+                              paymentRequest.getPaymentDate() : LocalDateTime.now());
+        payment.setAmount(paymentRequest.getAmount());
+        payment.setMethod(paymentRequest.getMethod());
+        payment.setStatus(paymentRequest.getStatus() != null ? 
+                         paymentRequest.getStatus() : PaymentStatus.PENDING);
         
-        return mapToDto(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+        return convertToResponse(savedPayment);
     }
     
-    @Async
-    public void processPaymentAsync(Long paymentId, PaymentRequestDto paymentRequest) {
+    public List<PaymentResponse> getAllPayments() {
+        return paymentRepository.findAll().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+    
+    public Optional<PaymentResponse> getPaymentById(Long id) {
+        return paymentRepository.findById(id)
+                .map(this::convertToResponse);
+    }
+    
+    public Optional<PaymentResponse> getPaymentByPaymentId(String paymentId) {
+        return paymentRepository.findByPaymentId(paymentId)
+                .map(this::convertToResponse);
+    }
+    
+    public List<PaymentResponse> getPaymentsByStatus(PaymentStatus status) {
+        return paymentRepository.findByStatus(status).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+    
+    public PaymentResponse updatePaymentStatus(Long id, PaymentStatus status) {
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payment not found with id: " + id));
+        
+        payment.setStatus(status);
+        Payment updatedPayment = paymentRepository.save(payment);
+        return convertToResponse(updatedPayment);
+    }
+    
+    public PaymentResponse updatePaymentStatusByPaymentId(String paymentId, PaymentStatus status) {
+        Payment payment = paymentRepository.findByPaymentId(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with paymentId: " + paymentId));
+        
+        payment.setStatus(status);
+        Payment updatedPayment = paymentRepository.save(payment);
+        return convertToResponse(updatedPayment);
+    }
+    
+    public void deletePayment(Long id) {
+        if (!paymentRepository.existsById(id)) {
+            throw new RuntimeException("Payment not found with id: " + id);
+        }
+        paymentRepository.deleteById(id);
+    }
+    
+    public PaymentResponse processPayment(String paymentId) {
+        Payment payment = paymentRepository.findByPaymentId(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with paymentId: " + paymentId));
+        
+        // Simulate payment processing logic
         try {
-            Payment payment = paymentRepository.findById(paymentId)
-                    .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
-            
-            // Update status to processing
             payment.setStatus(PaymentStatus.PROCESSING);
             paymentRepository.save(payment);
             
-            // Find appropriate gateway
-            PaymentGateway gateway = findPaymentGateway(paymentRequest.getPaymentMethod().name());
+            // Simulate processing time
+            Thread.sleep(1000);
             
-            // Process payment
-            PaymentGatewayResponse response = gateway.processPayment(paymentRequest);
-            
-            // Update payment based on response
-            updatePaymentFromGatewayResponse(payment, response);
-            
-        } catch (Exception e) {
-            log.error("Error processing payment with id: {}", paymentId, e);
-            handlePaymentFailure(paymentId, e.getMessage());
-        }
-    }
-    
-    @Transactional(readOnly = true)
-    public PaymentDto getPaymentById(Long id) {
-        log.info("Fetching payment with id: {}", id);
-        
-        Payment payment = paymentRepository.findById(id)
-                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + id));
-        
-        return mapToDto(payment);
-    }
-    
-    @Transactional(readOnly = true)
-    public PaymentDto getPaymentByReference(String paymentReference) {
-        log.info("Fetching payment with reference: {}", paymentReference);
-        
-        Payment payment = paymentRepository.findByPaymentReference(paymentReference)
-                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with reference: " + paymentReference));
-        
-        return mapToDto(payment);
-    }
-    
-    @Transactional(readOnly = true)
-    public List<PaymentDto> getPaymentsByOrderId(Long orderId) {
-        log.info("Fetching payments for order: {}", orderId);
-        
-        List<Payment> payments = paymentRepository.findByOrderId(orderId);
-        return payments.stream().map(this::mapToDto).toList();
-    }
-    
-    @Transactional(readOnly = true)
-    public Page<PaymentDto> getPaymentsByUserId(Long userId, Pageable pageable) {
-        log.info("Fetching payments for user: {}", userId);
-        
-        Page<Payment> payments = paymentRepository.findByUserId(userId, pageable);
-        return payments.map(this::mapToDto);
-    }
-    
-    @Transactional(readOnly = true)
-    public Page<PaymentDto> getPaymentsByStatus(List<PaymentStatus> statuses, Pageable pageable) {
-        log.info("Fetching payments with statuses: {}", statuses);
-        
-        Page<Payment> payments = paymentRepository.findByStatusIn(statuses, pageable);
-        return payments.map(this::mapToDto);
-    }
-    
-    public PaymentDto updatePaymentStatus(Long paymentId, PaymentStatus status) {
-        log.info("Updating payment {} status to {}", paymentId, status);
-        
-        Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new PaymentNotFoundException("Payment not found with id: " + paymentId));
-        
-        payment.setStatus(status);
-        if (status == PaymentStatus.COMPLETED || status == PaymentStatus.FAILED) {
-            payment.setProcessedAt(LocalDateTime.now());
-        }
-        
-        Payment updatedPayment = paymentRepository.save(payment);
-        return mapToDto(updatedPayment);
-    }
-    
-    private Payment createPaymentRecord(PaymentRequestDto paymentRequest) {
-        Payment payment = new Payment();
-        payment.setPaymentReference(generatePaymentReference());
-        payment.setOrderId(paymentRequest.getOrderId());
-        payment.setUserId(paymentRequest.getUserId());
-        payment.setAmount(paymentRequest.getAmount());
-        payment.setCurrency(paymentRequest.getCurrency());
-        payment.setPaymentMethod(paymentRequest.getPaymentMethod());
-        payment.setStatus(PaymentStatus.PENDING);
-        
-        return payment;
-    }
-    
-    private void updatePaymentFromGatewayResponse(Payment payment, PaymentGatewayResponse response) {
-        if (response.isSuccess()) {
-            payment.setStatus(PaymentStatus.COMPLETED);
-            payment.setGatewayTransactionId(response.getTransactionId());
-            payment.setGatewayResponse(response.getGatewayResponse());
-            payment.setProcessedAt(LocalDateTime.now());
-        } else {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(response.getMessage());
-            payment.setGatewayResponse(response.getGatewayResponse());
-            payment.setProcessedAt(LocalDateTime.now());
-        }
-        
-        paymentRepository.save(payment);
-        log.info("Payment {} updated with status: {}", payment.getId(), payment.getStatus());
-    }
-    
-    private void handlePaymentFailure(Long paymentId, String errorMessage) {
-        try {
-            Payment payment = paymentRepository.findById(paymentId).orElse(null);
-            if (payment != null) {
+            // Simulate successful payment (90% success rate)
+            if (Math.random() > 0.1) {
+                payment.setStatus(PaymentStatus.COMPLETED);
+            } else {
                 payment.setStatus(PaymentStatus.FAILED);
-                payment.setFailureReason(errorMessage);
-                payment.setProcessedAt(LocalDateTime.now());
-                paymentRepository.save(payment);
             }
-        } catch (Exception e) {
-            log.error("Error updating payment failure status for payment: {}", paymentId, e);
+            
+            Payment processedPayment = paymentRepository.save(payment);
+            return convertToResponse(processedPayment);
+            
+        } catch (InterruptedException e) {
+            payment.setStatus(PaymentStatus.FAILED);
+            Payment failedPayment = paymentRepository.save(payment);
+            return convertToResponse(failedPayment);
         }
     }
     
-    private PaymentGateway findPaymentGateway(String paymentMethod) {
-        return paymentGateways.stream()
-                .filter(gateway -> gateway.supports(paymentMethod))
-                .findFirst()
-                .orElseThrow(() -> new PaymentProcessingException("No gateway found for payment method: " + paymentMethod));
-    }
-    
-    private String generatePaymentReference() {
-        return "PAY-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
-    }
-    
-    private PaymentDto mapToDto(Payment payment) {
-        PaymentDto dto = new PaymentDto();
-        dto.setId(payment.getId());
-        dto.setPaymentReference(payment.getPaymentReference());
-        dto.setOrderId(payment.getOrderId());
-        dto.setUserId(payment.getUserId());
-        dto.setAmount(payment.getAmount());
-        dto.setCurrency(payment.getCurrency());
-        dto.setPaymentMethod(payment.getPaymentMethod());
-        dto.setStatus(payment.getStatus());
-        dto.setGatewayTransactionId(payment.getGatewayTransactionId());
-        dto.setGatewayResponse(payment.getGatewayResponse());
-        dto.setFailureReason(payment.getFailureReason());
-        dto.setProcessedAt(payment.getProcessedAt());
-        dto.setCreatedAt(payment.getCreatedAt());
-        dto.setUpdatedAt(payment.getUpdatedAt());
-        
-        return dto;
+    private PaymentResponse convertToResponse(Payment payment) {
+        return new PaymentResponse(
+                payment.getId(),
+                payment.getPaymentId(),
+                payment.getPaymentDate(),
+                payment.getAmount(),
+                payment.getMethod(),
+                payment.getStatus()
+        );
     }
 }

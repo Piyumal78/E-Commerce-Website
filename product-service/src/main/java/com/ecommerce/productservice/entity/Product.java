@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "products")
@@ -24,7 +25,7 @@ public class Product {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID id;
     
     @NotBlank(message = "Product name is required")
     @Column(nullable = false)
@@ -34,13 +35,11 @@ public class Product {
     private String description;
     
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @DecimalMin(value = "$0.0", inclusive = false, message = "Price must be greater than 0")
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
     
-    @Column(name = "image_url")
-    private String imageUrl;
-    
+
     @NotNull(message = "Stock quantity is required")
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
@@ -51,12 +50,6 @@ public class Product {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
-    
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-    
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+
+
 }

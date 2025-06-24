@@ -6,13 +6,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
     
     List<Category> findByActiveTrue();
     
-    Optional<Category> findByIdAndActiveTrue(Long id);
+    Optional<Category> findByIdAndActiveTrue(UUID id);
     
     Optional<Category> findByNameAndActiveTrue(String name);
     

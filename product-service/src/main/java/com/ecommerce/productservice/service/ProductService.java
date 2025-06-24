@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -61,9 +62,9 @@ public class ProductService {
     }
     
     @Transactional(readOnly = true)
-    public Page<ProductDto> getProductsWithFilters(String name, Long categoryId, 
-                                                 BigDecimal minPrice, BigDecimal maxPrice, 
-                                                 Pageable pageable) {
+    public Page<ProductDto> getProductsWithFilters(String name, UUID categoryId,
+                                                   BigDecimal minPrice, BigDecimal maxPrice,
+                                                   Pageable pageable) {
         log.info("Fetching products with filters - name: {}, categoryId: {}, minPrice: {}, maxPrice: {}", 
                 name, categoryId, minPrice, maxPrice);
         
@@ -83,7 +84,7 @@ public class ProductService {
         return products.map(this::mapToDto);
     }
     
-    public ProductDto updateProduct(Long id, ProductDto productDto) {
+    public ProductDto updateProduct(UUID id, ProductDto productDto) {
         log.info("Updating product with id: {}", id);
         
         Product existingProduct = productRepository.findByIdAndActiveTrue(id)
@@ -93,7 +94,6 @@ public class ProductService {
         existingProduct.setName(productDto.getName());
         existingProduct.setDescription(productDto.getDescription());
         existingProduct.setPrice(productDto.getPrice());
-        existingProduct.setImageUrl(productDto.getImageUrl());
         existingProduct.setStockQuantity(productDto.getStockQuantity());
         
         if (productDto.getCategoryId() != null) {
@@ -108,7 +108,7 @@ public class ProductService {
         return mapToDto(updatedProduct);
     }
     
-    public void deleteProduct(Long id) {
+    public void deleteProduct(UUID id) {
         log.info("Deleting product with id: {}", id);
         
         Product product = productRepository.findByIdAndActiveTrue(id)
@@ -121,7 +121,7 @@ public class ProductService {
         log.info("Product deleted successfully with id: {}", id);
     }
     
-    public ProductDto updateStock(Long id, Integer quantity) {
+    public ProductDto updateStock(UUID id, Integer quantity) {
         log.info("Updating stock for product id: {} to quantity: {}", id, quantity);
         
         Product product = productRepository.findByIdAndActiveTrue(id)
@@ -148,11 +148,8 @@ public class ProductService {
         dto.setName(product.getName());
         dto.setDescription(product.getDescription());
         dto.setPrice(product.getPrice());
-        dto.setImageUrl(product.getImageUrl());
         dto.setStockQuantity(product.getStockQuantity());
         dto.setActive(product.getActive());
-        dto.setCreatedAt(product.getCreatedAt());
-        dto.setUpdatedAt(product.getUpdatedAt());
         
         if (product.getCategory() != null) {
             dto.setCategoryId(product.getCategory().getId());
@@ -167,7 +164,6 @@ public class ProductService {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
-        product.setImageUrl(dto.getImageUrl());
         product.setStockQuantity(dto.getStockQuantity());
         product.setActive(dto.getActive() != null ? dto.getActive() : true);
         

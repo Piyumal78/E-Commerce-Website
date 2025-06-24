@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +36,7 @@ public class CategoryService {
     }
     
     @Transactional(readOnly = true)
-    public CategoryDto getCategoryById(Long id) {
+    public CategoryDto getCategoryById(UUID id) {
         log.info("Fetching category with id: {}", id);
         
         Category category = categoryRepository.findByIdAndActiveTrue(id)
@@ -92,14 +93,12 @@ public class CategoryService {
         dto.setName(category.getName());
         dto.setDescription(category.getDescription());
         dto.setActive(category.getActive());
-        dto.setCreatedAt(category.getCreatedAt());
-        dto.setUpdatedAt(category.getUpdatedAt());
-        
         return dto;
     }
     
     private Category mapToEntity(CategoryDto dto) {
         Category category = new Category();
+        category.setId(dto.getId());
         category.setName(dto.getName());
         category.setDescription(dto.getDescription());
         category.setActive(dto.getActive() != null ? dto.getActive() : true);
